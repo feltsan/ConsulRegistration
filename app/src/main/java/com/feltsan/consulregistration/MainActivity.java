@@ -1,5 +1,7 @@
 package com.feltsan.consulregistration;
 
+import android.content.Context;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,6 +17,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -43,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private String code = "";
     private Document documentCookie = null, documetPageOfCode = null;
     String cookie = "";
+    Context context;
 
 
     @Override
@@ -50,19 +54,21 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
+        final String path = Environment.getExternalStorageDirectory().getPath();
+
         get = (Button) findViewById(R.id.getButton);
         text = (TextView) findViewById(R.id.output);
-
+        context = this;
         get.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-               getCookie();
+               getCookie(path);
             }
         });
 
     }
 
-    public void getCookie(){
+    public void getCookie(final String path){
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -84,11 +90,11 @@ public class MainActivity extends AppCompatActivity {
                         }
 
                         if (!cookie.isEmpty()) {
-                            getCode(cookie);
+                            getCode(cookie, path);
                         } else
-                            getCookie();
+                            getCookie(path);
                     }else
-                        getCookie();
+                        getCookie(path);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -96,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
         }).start();
         }
 
-    public String getCode(final String cookie){
+    public String getCode(final String cookie, String path){
 
                 try {
                     documetPageOfCode = Jsoup.connect(homeURL)
@@ -113,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
 
                     System.out.println("CODE is" + code);
 
-                    sendEmail(code);
+                    sendEmail(code,path);
 
                     runOnUiThread(new Runnable() {
                         @Override
@@ -133,16 +139,16 @@ public class MainActivity extends AppCompatActivity {
 
                 } else {
                     if (!cookie.isEmpty())
-                        getCode(cookie);
+                        getCode(cookie,path);
                     else
-                        getCookie();
+                        getCookie(path);
                 }
                 return code;
     }
 
 
 
-    public static void sendEmail(String code) {
+    public static void sendEmail(String code,String path) {
         Properties props = new Properties();
         props.put("mail.smtp.host", "smtp.gmail.com");
         props.put("mail.smtp.socketFactory.port", "465");
@@ -158,10 +164,22 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             final Message message = new MimeMessage(session);
+            String passport = "passport.pdf";
+            String contract = "contract.pdf";
+            Multipart multipart = new MimeMultipart();
+            MimeBodyPart messageBodyPart = new MimeBodyPart();
+            String m = "file attached. ";
+            messageBodyPart.setText(m, "utf-8", "html");
+            multipart.addBodyPart(messageBodyPart);
+
+            MimeBodyPart attachmentBodyPart = new MimeBodyPart();
+            attachmentBodyPart.attachFile(new File(path+ "/" + passport));
+            attachmentBodyPart.attachFile(new File(path +"/"+ contract));
+            multipart.addBodyPart(attachmentBodyPart);
             message.setFrom(new InternetAddress("elvirafeltsan@gmail.com"));
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse("ivan.feltsan@gmail.com"));
             message.setSubject(code);
-            message.setContent(code, "text/html; charset=utf-8");
+            message.setContent(multipart);
 
             Thread thread = new Thread(new Runnable() {
                 @Override
@@ -179,6 +197,8 @@ public class MainActivity extends AppCompatActivity {
 
         } catch (MessagingException e) {
             throw new RuntimeException(e);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
